@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoPawn 会員登録後ステップメール 設計書</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: #f5f6f8;
+    color: #1a1a2e;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2c2750 60%, #c9a227 100%);
+    color: #fff;
+    padding: 48px 24px 36px;
+    text-align: center;
+  }
+  .page-header h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; letter-spacing: .02em; }
+  .page-header p { font-size: 13px; color: #d8d3b3; }
+  .page-header .meta {
+    display: inline-flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; justify-content: center;
+    font-size: 12px; color: #f2e5a7;
+  }
+  .page-header .meta span { background: rgba(255,255,255,.08); padding: 4px 12px; border-radius: 6px; }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 12px;
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: #475569; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .legend-dot.blue { background: #3b82f6; }
+  .legend-dot.green { background: #22c55e; }
+  .legend-dot.gold { background: #c9a227; }
+  .legend-dot.orange { background: #f59e0b; }
+  .legend-dot.gray { background: #94a3b8; }
+
+  /* ── Sticky TOC ── */
+  .nav-toc {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 20px;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 46px;
+    z-index: 99;
+  }
+  .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 16px;
+    text-decoration: none;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    transition: all .15s;
+    cursor: pointer;
+  }
+  .nav-btn:hover { background: #e2e8f0; }
+  .nav-btn .nav-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Container ── */
+  .container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+
+  /* ── Intro ── */
+  .intro {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  .intro h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #1a1a2e; }
+  .intro p { font-size: 13px; color: #475569; margin-bottom: 8px; }
+  .intro ul { font-size: 13px; color: #475569; padding-left: 20px; }
+  .intro li { margin-bottom: 4px; }
+  .intro strong { color: #1a1a2e; }
+
+  /* ── Step card ── */
+  .step { margin-bottom: 0; scroll-margin-top: 130px; }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+    overflow: hidden;
+    transition: box-shadow .2s;
+  }
+  .card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06); }
+
+  .card-border-blue   { border-left: 4px solid #3b82f6; }
+  .card-border-green  { border-left: 4px solid #22c55e; }
+  .card-border-gold   { border-left: 4px solid #c9a227; }
+  .card-border-orange { border-left: 4px solid #f59e0b; }
+  .card-border-gray   { border-left: 4px solid #94a3b8; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+  }
+  .card-day {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: #1a1a2e; padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+  }
+  .card-title { font-size: 16px; font-weight: 700; flex: 1; color: #1a1a2e; }
+  .badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+  .badge-intro    { background: #dbeafe; color: #1e40af; }
+  .badge-guide    { background: #dcfce7; color: #166534; }
+  .badge-edu      { background: #fef3c7; color: #92400e; }
+  .badge-cross    { background: #fde68a; color: #854d0e; }
+  .badge-remind   { background: #ffe4e6; color: #9f1239; }
+
+  .card-body { padding: 18px 22px 22px; }
+  .card-trigger {
+    font-size: 11px; color: #64748b; margin-bottom: 12px;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    padding: 6px 10px; border-radius: 6px;
+  }
+  .card-trigger b { color: #1a1a2e; }
+
+  /* ── Email preview (mail-like layout) ── */
+  .mail-preview {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  .mail-head {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #475569;
+  }
+  .mail-head .from { font-weight: 600; color: #1a1a2e; }
+  .mail-head .subj { display: block; font-weight: 700; color: #1a1a2e; font-size: 14px; margin-top: 4px; }
+  .mail-body {
+    padding: 18px 18px 20px;
+    font-size: 13px;
+    line-height: 1.85;
+    color: #1a1a2e;
+    white-space: pre-line;
+  }
+  .mail-body .cta {
+    display: inline-block;
+    margin: 12px 0;
+    padding: 10px 22px;
+    background: linear-gradient(135deg, #c9a227, #e7c14b);
+    color: #1a1a2e;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 6px;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(201,162,39,.25);
+  }
+  .mail-body .cta.dark {
+    background: linear-gradient(135deg, #1a1a2e, #2c2750);
+    color: #f2e5a7;
+  }
+  .mail-body .cta.blue {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+  }
+  .mail-body .cta.green {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff;
+  }
+  .mail-body .small { font-size: 11px; color: #64748b; }
+
+  /* ── Sections inside email ── */
+  .step-list {
+    background: #fafbfd;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+  }
+  .step-list ol { padding-left: 18px; font-size: 13px; line-height: 1.9; }
+  .step-list li { margin-bottom: 6px; }
+  .step-list b { color: #1a1a2e; }
+
+  .compare-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .compare-row { display: grid; grid-template-columns: 1fr 1fr; }
+  .compare-cell {
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .compare-cell.head {
+    font-weight: 700;
+    font-size: 13px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .compare-cell.left { background: #fef2f2; border-right: 1px solid #e2e8f0; }
+  .compare-cell.right { background: #f0fdf4; }
+  .compare-cell.left.head { color: #991b1b; }
+  .compare-cell.right.head { color: #166534; }
+
+  .callout {
+    background: #fef9c3;
+    border-left: 4px solid #c9a227;
+    padding: 12px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #713f12;
+    margin: 12px 0;
+    line-height: 1.7;
+  }
+  .callout b { display: block; margin-bottom: 4px; color: #1a1a2e; }
+
+  .cross-card {
+    background: linear-gradient(135deg, #fff8e1 0%, #fefce8 100%);
+    border: 1px solid #facc15;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0;
+  }
+  .cross-card .label {
+    display: inline-block;
+    background: #1a1a2e;
+    color: #f2e5a7;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .cross-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: #1a1a2e; }
+  .cross-card p { font-size: 12px; color: #475569; margin-bottom: 8px; }
+
+  /* ── Note / Memo ── */
+  .note {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: #f1f5f9;
+    border-left: 3px solid #64748b;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #334155;
+    line-height: 1.7;
+  }
+  .note b { color: #1a1a2e; }
+
+  /* ── Survey table ── */
+  .survey-block {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 12px 0;
+  }
+  .survey-block h4 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: #1a1a2e; }
+  .survey-q {
+    border-top: 1px dashed #e2e8f0;
+    padding: 10px 0 8px;
+  }
+  .survey-q:first-of-type { border-top: 0; }
+  .q-label {
+    font-size: 12px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px;
+  }
+  .q-options {
+    font-size: 12px; color: #475569; line-height: 1.7;
+  }
+  .q-options .opt { display: inline-block; background: #f1f5f9; padding: 1px 8px; margin: 2px 4px 2px 0; border-radius: 4px; }
+  .q-type {
+    font-size: 10px; color: #64748b; background: #e2e8f0; padding: 1px 6px; border-radius: 4px;
+    margin-left: 6px; font-weight: 600;
+  }
+
+  /* ── Flow arrow ── */
+  .flow-arrow {
+    height: 28px; display: flex; justify-content: center; align-items: center; color: #cbd5e1; font-size: 20px;
+  }
+  .flow-arrow::after { content: '↓'; }
+
+  /* ── Feedback ── */
+  .feedback-area {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #e2e8f0;
+  }
+  .feedback-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #6366f1;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .feedback-toggle .fb-icon {
+    font-size: 10px;
+    background: #6366f1;
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .feedback-toggle .fb-count {
+    display: none; font-size: 10px; color: #4338ca; background: #ddd6fe;
+    padding: 0 6px; border-radius: 10px;
+  }
+  .feedback-toggle.has-content .fb-count { display: inline; }
+  .feedback-body { display: none; margin-top: 8px; }
+  .feedback-body.open { display: block; }
+  .feedback-textarea {
+    width: 100%;
+    min-height: 70px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.6;
+    resize: vertical;
+    color: #1a1a2e;
+    background: #fafbfd;
+  }
+  .feedback-textarea:focus { outline: none; border-color: #6366f1; background: #fff; }
+  .feedback-status { font-size: 10px; color: #94a3b8; margin-top: 4px; }
+
+  .export-bar {
+    text-align: center;
+    margin: 16px auto 0;
+  }
+  .export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6366f1;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all .15s;
+    margin: 0 4px;
+  }
+  .export-btn:hover { background: #e0e7ff; }
+  .export-btn.danger { color: #ef4444; background: #fef2f2; border-color: #fecaca; }
+  .export-btn.danger:hover { background: #fee2e2; }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .compare-row { grid-template-columns: 1fr; }
+    .compare-cell.left { border-right: 0; border-bottom: 1px solid #e2e8f0; }
+    .nav-toc { top: 44px; }
+    .page-header h1 { font-size: 20px; }
+  }
+  @media print {
+    .legend, .nav-toc, .export-bar, .feedback-area { display: none; }
+    body { background: #fff; }
+    .card { box-shadow: none; border: 1px solid #e2e8f0; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>CryptoPawn 会員登録後 ステップメール 設計書</h1>
+  <p>登録 → アンケート → 入金 → 教育 → クロスセル の全体フロー</p>
+  <div class="meta">
+    <span>v1.0｜2026-05-12</span>
+    <span>Leit On 大石</span>
+    <span>対象: 登録済み・未入金ユーザー（「あめふり」除外）</span>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot blue"></div>導入・アンケート</div>
+  <div class="legend-item"><div class="legend-dot green"></div>入金ガイド</div>
+  <div class="legend-item"><div class="legend-dot gold"></div>教育コンテンツ</div>
+  <div class="legend-item"><div class="legend-dot orange"></div>クロスセル</div>
+  <div class="legend-item"><div class="legend-dot gray"></div>未入金リマインド</div>
+</div>
+
+<div class="nav-toc">
+  <a href="#step-day0" class="nav-btn"><div class="nav-dot" style="background:#3b82f6"></div>Day 0 ウェルカム＋操作ガイド</a>
+  <a href="#step-day1" class="nav-btn"><div class="nav-dot" style="background:#22c55e"></div>Day 1 アンケート＋ギフト</a>
+  <a href="#step-day3" class="nav-btn"><div class="nav-dot" style="background:#c9a227"></div>Day 3 利確 vs CryptoPawn</a>
+  <a href="#step-day5" class="nav-btn"><div class="nav-dot" style="background:#f59e0b"></div>Day 5 クロスセル</a>
+  <a href="#step-day7" class="nav-btn"><div class="nav-dot" style="background:#94a3b8"></div>Day 7 未入金①</a>
+  <a href="#step-day14" class="nav-btn"><div class="nav-dot" style="background:#94a3b8"></div>Day 14 未入金②</a>
+  <a href="#step-day21" class="nav-btn"><div class="nav-dot" style="background:#94a3b8"></div>Day 21 締切＋最終</a>
+  <a href="#survey" class="nav-btn"><div class="nav-dot" style="background:#3b82f6"></div>アンケート設問</a>
+</div>
+
+<div class="container">
+
+  <!-- ── 全体設計 ── -->
+  <div class="intro">
+    <h2>このステップメールの設計方針</h2>
+    <p>
+      <strong>目的</strong>：会員登録済みの未入金ユーザーを、教育コンテンツで「CryptoPawnを使う合理的な理由」に納得してもらい、入金行動まで導く。あわせてアンケートで離脱要因を可視化し、UI/UX改善とCRM精度の向上につなげる。
+    </p>
+    <p><strong>サービス情報</strong>：CryptoPawn（運営: BitHills Inc.）｜公式: <code>cryptopawn.io</code>｜マイページ: <code>app.cryptopawn.io</code>｜サポート: <code>support@cryptopawn.io</code>｜送信元: <code>info@cryptopawn.io</code></p>
+    <p><strong>対象</strong>：登録者一覧スプシ（内部管理）から「あめふり」セグメントを除外したユーザー全員</p>
+    <p><strong>配信媒体</strong>：メール配信（推奨：Brevo / SendGrid / Mailchimp のいずれか。アンケートは Google フォーム + UTM パラメータでメール別の流入を計測）</p>
+    <p><strong>Amazonギフトカード500円</strong>：アンケート完了者全員にプレゼント（先着ではなく完了者全員＝離脱要因の網羅性を最優先）</p>
+    <p><strong>用語</strong>：本サービスのフルフローは「新規会員登録 → 本人確認 → 銀行情報登録 → ウォレット登録 → 契約申請 → 同意書 → 担保送金」の7ステップ。本ステップメールでは Day 1 で全工程を画像付きで案内し、未完了の項目だけを潰しに行く設計。</p>
+    <p><strong>全7通の役割分担</strong>：</p>
+    <ul>
+      <li><strong>Day 0</strong>：ウェルカム＋登録〜入金の全体像（操作ガイド・FAQ）</li>
+      <li><strong>Day 1</strong>：アンケート＋500円Amazonギフトキャンペーンのご案内</li>
+      <li><strong>Day 3</strong>：教育①「利確より、なぜCryptoPawnで預ける方が得か」</li>
+      <li><strong>Day 5</strong>：クロスセル（Cryptopanda / IZAKA-YA）</li>
+      <li><strong>Day 7</strong>：未入金リマインド①「よくある不安への回答」</li>
+      <li><strong>Day 14</strong>：未入金リマインド②「想定される利用シーン3つ」（実事例が手に入り次第差し替え）</li>
+      <li><strong>Day 21</strong>：Amazonギフト締切＋最終フォロー（アンケート2分訴求）</li>
+    </ul>
+  </div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 0: ウェルカム＋入金までの操作ガイド -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day0">
+    <div class="card card-border-blue">
+      <div class="card-header">
+        <span class="card-day">Day 0</span>
+        <span class="card-title">ウェルカム＋入金までの操作ガイド</span>
+        <span class="badge badge-intro">導入</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：会員登録完了直後（即時）｜<b>配信形式</b>：HTMLメール（画像／スクショ差し込み推奨）</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局 &lt;info@cryptopawn.io&gt;</span>
+            <span class="subj">【ご登録ありがとうございます】CryptoPawnで現金を借りるまでの操作ガイド</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+このたびはCryptoPawnにご登録いただきありがとうございます。
+暗号資産を売却せずに現金化できる、新しい選択肢をご活用いただける状態になりました。
+
+本日は、登録後から実際にお借入いただくまでの操作手順を、ステップごとにご案内します。
+
+<div class="step-list"><ol>
+<li><b>マイページにログイン</b>
+└ <code>app.cryptopawn.io</code> にて、登録メールアドレス／パスワードでログイン。</li>
+<li><b>セキュリティ設定（強く推奨）</b>
+└ 契約者基本情報ページから、<b>2段階認証</b>・<b>パスキー認証</b>を必ず設定してください。資産保護のため最優先で設定をお願いします。</li>
+<li><b>本人確認の提出</b>
+└ 「運転免許証」または「マイナンバーカード」をアップロード。
+└ <b>セルフィー</b>（身分証を手に持ち、顔全体が見える写真）をアップロード。
+└ <b>住所確認書類</b>（公共料金領収書／クレジットカード会社の請求書／携帯電話会社請求書等。発行日から3ヶ月以内のもの）をアップロード。</li>
+<li><b>銀行情報の登録</b>
+└ 融資金の振込先となる口座情報を登録します。<b>口座名義はご登録氏名と同一</b>である必要があります（カタカナ・半角英字の両方）。</li>
+<li><b>担保返却用ウォレットアドレスの登録</b>
+└ 返済後に担保暗号資産を返却する先のウォレットアドレスを登録します。
+└ <b>仮想通貨種類とアドレスは慎重にご確認ください</b>。誤りがあった場合、再送金はできません。</li>
+<li><b>契約申請</b>
+└ 「契約申請」ページから、ご希望の借入金額と担保にする暗号資産を選択。
+└ 入力後、必要な仮想通貨額が自動表示されます。
+└ <b>個人：5万円以上（5万円単位）〜最大1,000万円／法人：30万円以上（10万円単位）〜最大1,000万円</b>。
+└ <b>担保掛目は50%</b>（担保価値の半額まで借入可能）。</li>
+<li><b>同意書に同意 → 入金用ウォレットアドレスを受領</b>
+└ 同意書を最後までスクロールして「同意する」ボタンを有効化、押下。
+└ 表示される<b>入金用ウォレットアドレス</b>とご入金額を、コピー機能を使って取引所等から送金。</li>
+<li><b>着金確認 → 日本円をご指定口座へ振込</b>
+└ 担保の着金が確認でき次第、最短即日でご指定の銀行口座へ日本円をお振込みします。</li>
+</ol></div>
+
+<a href="{{login_url}}" class="cta dark">マイページで手続きを進める（app.cryptopawn.io）</a>
+
+──────────────────────
+■ よくあるご質問
+──────────────────────
+<b>Q. 借入の最小金額・最大金額は？</b>
+A. 個人は5万円から、法人は30万円から。最大1,000万円までご対応可能です。
+
+<b>Q. 月利・利息はいくら？</b>
+A. <b>月利0.1%（実質年率1.2%）</b>です。たとえば100万円を12ヶ月借りた場合、利息総額は12,000円。<b>手数料は0円</b>です。
+
+<b>Q. 担保掛目（LTV）は？</b>
+A. 50%です。お預かりした暗号資産の時価評価額の50%まで借入が可能です。
+
+<b>Q. 返済期間は？</b>
+A. 基本は12ヶ月（自動更新）、最短は契約から61日経過後、最長は10年までご対応可能です。
+
+<b>Q. 担保にした暗号資産はどうなる？</b>
+A. 返済完了後、お預かりした暗号資産はそのままお戻しします。途中で売却されることはありません。<b>質流れ（強制決済）もございません</b>。
+
+<b>Q. 返済は日本円のみ？</b>
+A. 日本円のお振込みのほか、<b>暗号資産による返済（代物弁済）</b>も可能です。
+
+──────────────────────
+■ 注意事項
+──────────────────────
+・申請から一定時間を超えて担保のご入金が確認された場合、確認時点の為替レートが適用され、為替変動によりお振込額が当初予定より少なくなる場合があります。
+・指定されたトークン種別のネットワーク以外でご送金された場合、資産が失われる可能性があります。
+
+──────────────────────
+■ お願い：メール受信設定
+──────────────────────
+今後の重要なお知らせをお届けするため、<b>「cryptopawn.io」ドメインからのメールを受信できる設定</b>をお願いいたします。
+
+──────────────────────
+操作で迷われた場合は、マイページ内の「お問い合わせ」よりご連絡ください。
+
+CryptoPawn 運営事務局
+support@cryptopawn.io</div>
+        </div>
+
+        <div class="note">
+          <b>設計意図</b>
+          1通目は「入金までの完全フロー」を一気に渡すことを最優先。先方FB「1通目を入金までの手順、2通目をキャンペーンに」を反映。スクリーンショット差し込み・90秒の操作動画リンクの併用を推奨。
+        </div>
+
+        <div class="feedback-area" data-step="day0">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day0" placeholder="Day 0 へのコメント・修正依頼をここに..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 1: アンケート＋Amazonギフトキャンペーン -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day1">
+    <div class="card card-border-green">
+      <div class="card-header">
+        <span class="card-day">Day 1</span>
+        <span class="card-title">アンケート＋Amazonギフトキャンペーン</span>
+        <span class="badge badge-guide">キャンペーン</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：登録から24時間後｜<b>配信形式</b>：HTMLメール（CTAは1つに絞る）</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局</span>
+            <span class="subj">【全員プレゼント】2分のアンケートで Amazonギフト500円</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+CryptoPawn 運営事務局です。
+昨日はサービスご利用までの操作ガイドをお送りしました。本日は、サービス改善のためのアンケートのご案内です。
+
+──────────────────────
+■ <b>2分で完了</b>　ご回答者全員にAmazonギフト500円分プレゼント
+──────────────────────
+CryptoPawnをより使いやすくするために、簡単なアンケートにご協力ください。
+所要時間は<b>約2分</b>。スマホからでもサッと回答いただけます。
+
+・先着ではなく、<b>ご回答いただいた方全員</b>に Amazonギフトカード 500円分をプレゼント
+・受付期限：<b>登録から21日以内</b>
+・送付：ご回答完了の翌営業日にメールでギフトコードをお送りします
+
+<a href="{{survey_url}}" class="cta">アンケートに回答する（2分で完了）</a>
+
+──────────────────────
+■ どんなことを聞きますか？
+──────────────────────
+・CryptoPawnをどちらでお知りになったか
+・利用を検討された理由
+・登録〜入金フローで分かりづらかった点（あれば）
+・改善してほしい点（自由記述・任意）
+
+ご記入いただいた内容は、UI/UXや手続きフローの改善に活用させていただきます。
+率直なご意見をお寄せいただけますと幸いです。
+
+──────────────────────
+■ 入金がまだの方へ
+──────────────────────
+入金（担保預け入れ）の手続きは、マイページから進めていただけます。
+昨日お送りした「操作ガイド」のメールに、ステップごとの手順をまとめております。
+
+<a href="{{login_url}}" class="cta dark">マイページにログイン</a>
+
+ご不明点はマイページ内の「お問い合わせ」よりお気軽にどうぞ。
+
+CryptoPawn 運営事務局
+support@cryptopawn.io</div>
+        </div>
+
+        <div class="callout">
+          <b>運用メモ</b>
+          2通目はアンケート＋Amazonギフトのみに集中。「2分で完了」を冒頭・CTA双方に明示して回答ハードルを下げる。あわせて未入金者への軽いリマインドを末尾に置く（Day 7以降のリマインドへつなぐ伏線）。
+        </div>
+
+        <div class="feedback-area" data-step="day1">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day1" placeholder="Day 1 へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 3: 教育① 利確 vs CryptoPawn -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day3">
+    <div class="card card-border-gold">
+      <div class="card-header">
+        <span class="card-day">Day 3</span>
+        <span class="card-title">教育①「利確（売却）より、なぜCryptoPawnで預けた方が得か」</span>
+        <span class="badge badge-edu">教育コンテンツ</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：登録から3日後｜<b>配信形式</b>：HTMLメール（比較表ビジュアル）</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局</span>
+            <span class="subj">「利確」する前に、知っておきたい3つのこと</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+「利益が出ているから、一部を売って現金化しようか」
+──そう考えた瞬間に、実は3つのコストが発生します。
+
+<div class="compare-box">
+<div class="compare-row">
+<div class="compare-cell left head">利確（売却）して現金化する場合</div>
+<div class="compare-cell right head">CryptoPawnで担保にして借りる場合</div>
+</div>
+<div class="compare-row">
+<div class="compare-cell left">最大55%の所得税・住民税が発生（雑所得・総合課税）</div>
+<div class="compare-cell right">借入なので<b>課税対象外</b>。確定申告も不要。</div>
+</div>
+<div class="compare-row">
+<div class="compare-cell left">価格が上昇しても、売却済みなので利益は受け取れない</div>
+<div class="compare-cell right">担保はそのまま保有扱い。<b>値上がり益は引き続き獲得可能</b>。</div>
+</div>
+<div class="compare-row">
+<div class="compare-cell left">再度買い直すなら、取引所手数料・スプレッドが二重に発生</div>
+<div class="compare-cell right">返済後に戻ってくる暗号資産は<b>同じ枚数</b>。買い直しコストゼロ。</div>
+</div>
+</div>
+
+──────────────────────
+■ シンプルな試算（時価2,000万円分のBTCを担保に、1,000万円を現金化）
+──────────────────────
+<b>売却して現金化する場合</b>
+　→ 1,000万円の売却益が出ているとして、想定税負担：最大 約550万円（税率55%）
+　→ 手元に残る現金：約450万円
+　→ さらに価格が上がっても、売却済みなので利益は受け取れない
+
+<b>CryptoPawnで担保にする場合</b>
+　→ 利息は<b>月利0.1%（実質年率1.2%）</b>のみ
+　→ 1,000万円を12ヶ月借りた場合の利息：<b>120,000円</b>（手数料は0円）
+　→ 担保のBTCはそのまま保有扱い、<b>値上がり益も引き続き獲得可能</b>
+　→ 返済時には同枚数のBTCが戻ってくる
+
+差額は、税金約550万円 vs 利息12万円。
+「いつか手放すかもしれない暗号資産」を、一時的に資金として活用する。
+これがCryptoPawnを選ばれている、最大の理由です。
+
+<a href="{{login_url}}" class="cta">具体的な借入額をシミュレーションする</a>
+
+──────────────────────
+※税負担は所得状況により異なります。詳細は税理士にご相談ください。
+本メールは税務助言を目的としたものではありません。
+
+CryptoPawn 運営事務局</div>
+        </div>
+
+        <div class="note">
+          <b>設計意図</b>
+          ここがステップメールの「核」。「利確より預け入れの方が経済合理性が高い」というCryptoPawnの最大の強みを、定量的に見せ切る。税率55%は最大ケースなので必ず脚注を入れる（コンプラ）。試算は単純化したシナリオに留めることで、税務助言と誤解されないようガード。
+        </div>
+
+        <div class="feedback-area" data-step="day3">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day3" placeholder="Day 3 へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 5: クロスセル -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day5">
+    <div class="card card-border-orange">
+      <div class="card-header">
+        <span class="card-day">Day 5</span>
+        <span class="card-title">クロスセル「IZAKAYA / Cryptopanda の活用法」</span>
+        <span class="badge badge-cross">クロスセル</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：登録から5日後｜<b>配信形式</b>：HTMLメール＋関連サービスカード</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局</span>
+            <span class="subj">【CryptoPawnと一緒に】日本円で気軽にトークン購入できるサービスのご紹介</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+CryptoPawnをご利用いただいているお客様向けに、姉妹サービスをご紹介します。
+どちらも「暗号資産を、もっと身近に・もっと使いやすく」をテーマにしたサービスです。
+
+<div class="cross-card">
+<h4>Cryptopanda — 日本円で暗号資産を、手数料0円で直接購入</h4>
+<p>
+たとえば IZAKAYA トークン（IZKY）のような銘柄を、海外取引所（LBank や BTSE など）で購入する場合、一度USDTを送って取引所内で交換する必要があり、初心者にはハードルがあります。
+
+<b>Cryptopanda を使えば、日本円から直接 暗号資産を購入</b>できます。
+　・<b>手数料0円</b>のピアツーピア交換プラットフォーム
+　・BTC・USDT・ETH・JPYR・JPYC など主要11銘柄に対応
+　・PC・スマホ両対応、直感的な操作で完結
+</p>
+<a href="https://cryptopanda.app/" class="cta dark">Cryptopanda（cryptopanda.app）を見る</a>
+</div>
+
+<div class="cross-card">
+<h4>IZAKA-YA — 暗号資産のレンディング＆スワッピング</h4>
+<p>
+IZAKA-YA は、暗号資産のレンディング（貸付）とスワッピング（交換）を簡単に行える暗号資産取引サービスです。
+
+CryptoPawnで担保にしていない暗号資産を保有されている場合、IZAKA-YA でレンディングして運用するという選択肢もあります。
+</p>
+<a href="https://izakaya.tech/" class="cta dark">IZAKA-YA（izakaya.tech）を見る</a>
+</div>
+
+──────────────────────
+CryptoPawn・Cryptopanda・IZAKAYA は、それぞれ独立したサービスですが、組み合わせて使うことで、
+<b>「資金調達 → 購入 → 利用」までを一気通貫</b>で完結できます。
+
+ご興味のあるサービスから、お気軽にチェックしてみてください。
+
+CryptoPawn 運営事務局</div>
+        </div>
+
+        <div class="note">
+          <b>運用メモ</b>
+          クロスセルは「押し売り」になりがちなので、Day 5まで引っ張って関係構築後に出す設計。逆方向（IZAKAYA・Cryptopanda 側のステップでは CryptoPawn を紹介）も同じテンプレートで横展開可能。先方が指定するアフィリエイトリンク／UTM があればここに差し込む。
+        </div>
+
+        <div class="feedback-area" data-step="day5">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day5" placeholder="Day 5 へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 7: 未入金リマインド① -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day7">
+    <div class="card card-border-gray">
+      <div class="card-header">
+        <span class="card-day">Day 7</span>
+        <span class="card-title">未入金リマインド① よくある不安への回答</span>
+        <span class="badge badge-remind">リマインド</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：登録から7日後、かつ <b>未入金（担保未送付）</b>のユーザーのみ｜<b>配信形式</b>：HTMLメール</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局</span>
+            <span class="subj">【ご検討中の方へ】CryptoPawnを使う前に、よくいただく3つのご質問</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+ご登録から1週間が経ちました。
+「気にはなっているけれど、まだ踏み出せていない」── そんな方向けに、よくいただくご質問にお答えします。
+
+──────────────────────
+<b>Q1. 預けた暗号資産は、本当に戻ってきますか？</b>
+──────────────────────
+返済完了時点で、お預かりした暗号資産は<b>同じ枚数</b>で全額お戻しします。
+運営による売却・運用は一切行いません。契約条件は事前に書面で明示します。
+
+──────────────────────
+<b>Q2. 価格が大きく下落したらどうなりますか？</b>
+──────────────────────
+CryptoPawnは、<b>質流れ（強制決済）がない</b>のが特徴です。
+担保掛目は50%に設定しているため、価格変動に対する緩衝があります。詳細な取扱いは、契約申請時の同意書にて明示しております。
+
+──────────────────────
+<b>Q3. 少額でも借りられますか？</b>
+──────────────────────
+はい。<b>個人は5万円から、最大1,000万円まで</b>柔軟にご対応します。
+まずは試しに少額からスタートされる方も多くいらっしゃいます。
+
+──────────────────────
+■ それでもご不明点がある方へ
+──────────────────────
+ご質問・ご相談は、マイページ内の「お問い合わせ」より承っております。
+担当者よりご回答いたしますので、お気軽にお寄せください。
+
+<a href="{{login_url}}" class="cta blue">マイページの「お問い合わせ」を開く</a>
+
+<span class="small">※お問い合わせいただいた内容で契約や入金を強制することは一切ございません。</span>
+
+CryptoPawn 運営事務局</div>
+        </div>
+
+        <div class="note">
+          <b>設計意図</b>
+          未入金リマインドは「煽る」のではなく「不安を分解して言語化する」方向で設計。CTA は「申込」ではなく「お問い合わせ」にして心理的ハードルを下げる。Q2の価格下落リスクは「質流れがない」差別化ポイントとして転換。
+        </div>
+
+        <div class="feedback-area" data-step="day7">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day7" placeholder="Day 7 へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 14: 未入金リマインド② -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day14">
+    <div class="card card-border-gray">
+      <div class="card-header">
+        <span class="card-day">Day 14</span>
+        <span class="card-title">未入金リマインド② 想定される利用シーン</span>
+        <span class="badge badge-remind">リマインド</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：登録から14日後、かつ未入金のユーザーのみ｜<b>配信形式</b>：HTMLメール</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局</span>
+            <span class="subj">CryptoPawnは、こんな場面で使えます</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+CryptoPawnをご検討いただきありがとうございます。
+本日は、暗号資産を担保にした借入が「どんな場面で活きるか」を、想定される利用シーンとしてご紹介します。
+
+<span class="small">※下記は実在の事例ではなく、CryptoPawnを活用できる典型的な場面を想定したイメージです。</span>
+
+──────────────────────
+<b>SCENE 1：BTCを売らずに、まとまった資金を調達したいとき</b>
+──────────────────────
+保有BTCの売却益には所得税・住民税が発生します。CryptoPawnで担保にすれば、<b>BTCを売らずに現金を引き出せる</b>ため、税負担を避けながら資金を活用可能。返済すれば<b>BTCはそのまま戻ってきます</b>。
+
+──────────────────────
+<b>SCENE 2：急な資金需要に、最短即日で対応したいとき</b>
+──────────────────────
+取引先支払いや一時的な資金需要に、銀行融資が間に合わないことがあります。CryptoPawnなら、担保の着金確認後、<b>最短即日で日本円が指定口座へ着金</b>。煩雑な収入証明等は不要です。
+
+──────────────────────
+<b>SCENE 3：仮想通貨の納税原資を、二重課税なしで確保したいとき</b>
+──────────────────────
+仮想通貨の利益で発生した所得税の納付資金を、追加の売却で捻出すると<b>「税金を払うためにまた税金が発生する」</b>構図に。CryptoPawnで担保にすれば、売却せずに納付資金を確保できます。
+
+──────────────────────
+■ 「自分のケースだとどうなるか」をご相談ください
+──────────────────────
+お客様ごとに事情は異なります。借入額の試算や担保にする暗号資産の選び方など、
+具体的なご質問は、マイページ内の「お問い合わせ」よりお気軽にお寄せください。
+
+<a href="{{login_url}}" class="cta blue">マイページの「お問い合わせ」から相談する</a>
+
+<span class="small">※上記は実在の事例ではなく、想定される利用シーンのイメージです。実際の借入条件は契約申請時にご確認ください。</span>
+
+CryptoPawn 運営事務局</div>
+        </div>
+
+        <div class="note">
+          <b>運用メモ</b>
+          現状は「想定される利用シーン」として明確に仮想話の枠で出している（実在の事例ではないため）。先方から実利用ケースを2〜3件いただけたタイミングで、実事例（匿名化＋掲載許諾済）に差し替えると訴求力が増す。
+        </div>
+
+        <div class="feedback-area" data-step="day14">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day14" placeholder="Day 14 へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- Day 21: 最終フォロー -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="step-day21">
+    <div class="card card-border-gray">
+      <div class="card-header">
+        <span class="card-day">Day 21</span>
+        <span class="card-title">Amazonギフト締切＋最終フォロー</span>
+        <span class="badge badge-remind">最終リマインド</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>トリガー</b>：登録から21日後（全員、ただしアンケート未回答者・未入金者向けに本文差し替え）｜<b>配信形式</b>：HTMLメール</div>
+
+        <div class="mail-preview">
+          <div class="mail-head">
+            <span class="from">CryptoPawn 運営事務局</span>
+            <span class="subj">【本日締切・2分で完了】Amazonギフト500円分プレゼント</span>
+          </div>
+          <div class="mail-body">{{user_name}} 様
+
+会員ご登録から3週間が経ちました。
+CryptoPawnをより使いやすくするためのアンケートは、<b>本日が締切</b>となります。
+
+<b>所要時間はわずか2分。</b> ご回答いただいた方全員に、Amazonギフトカード500円分をプレゼントいたします。
+
+<a href="{{survey_url}}" class="cta">アンケートに回答する（2分・締切：本日23:59）</a>
+
+「忙しくて後回しに…」という方も、2分あれば完了します。ぜひこの機会にご協力ください。
+
+──────────────────────
+■ 改めて、CryptoPawnでできること
+──────────────────────
+　・暗号資産を売らずに、現金を調達できる
+　・<b>月利0.1%（実質年率1.2%）</b>・<b>手数料0円</b>
+　・<b>個人5万円〜最大1,000万円</b>（法人30万円〜）
+　・返済すれば暗号資産はそのまま戻ってくる（<b>質流れなし</b>）
+　・契約実績10億円突破、最短即日で着金
+
+「いつか必要になるかも」「もう少し検討してから」── そう感じている間に、
+資金需要のタイミングや暗号資産の市況は変わっていきます。
+
+ご質問はマイページ内の「お問い合わせ」よりお気軽にどうぞ。
+
+<a href="{{login_url}}" class="cta dark">マイページにログイン</a>
+
+──────────────────────
+今後、CryptoPawn からの配信が不要な場合は、こちらから配信停止いただけます。
+{{unsubscribe_url}}
+
+引き続きどうぞよろしくお願いいたします。
+
+CryptoPawn 運営事務局
+support@cryptopawn.io</div>
+        </div>
+
+        <div class="note">
+          <b>設計意図</b>
+          21日目は「Amazonギフト締切」という具体的な期限を理由にした最後のリマインド。先方FB反映で「2分で完了」を件名・冒頭・CTAの3か所に分散配置し、回答ハードルを徹底的に下げる設計。配信停止リンクをここで明示することで、CRMリストの健全性を維持。
+        </div>
+
+        <div class="feedback-area" data-step="day21">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-day21" placeholder="Day 21 へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- アンケート設問詳細 -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step" id="survey">
+    <div class="card card-border-blue">
+      <div class="card-header">
+        <span class="card-day">SURVEY</span>
+        <span class="card-title">アンケート設問詳細（Googleフォーム想定）</span>
+        <span class="badge badge-intro">設問案</span>
+      </div>
+      <div class="card-body">
+        <div class="card-trigger"><b>配布媒体</b>：Googleフォーム（無料・集計楽・スプシ連携可）｜<b>所要</b>：約2分｜<b>謝礼</b>：完了者全員にAmazonギフト500円</div>
+
+        <div class="survey-block">
+          <h4>セクション1：基本情報</h4>
+
+          <div class="survey-q">
+            <div class="q-label">Q1. どちらでCryptoPawnをお知りになりましたか？<span class="q-type">単一選択</span></div>
+            <div class="q-options">
+              <span class="opt">Google検索（広告）</span>
+              <span class="opt">Google検索（自然検索）</span>
+              <span class="opt">SNS（X / Twitter）</span>
+              <span class="opt">SNS（YouTube）</span>
+              <span class="opt">SNS（その他）</span>
+              <span class="opt">知人・友人からの紹介</span>
+              <span class="opt">Webメディア・記事</span>
+              <span class="opt">その他（自由記述）</span>
+            </div>
+          </div>
+
+          <div class="survey-q">
+            <div class="q-label">Q2. CryptoPawnの利用を検討した、主な理由は何ですか？<span class="q-type">複数選択可</span></div>
+            <div class="q-options">
+              <span class="opt">暗号資産を売却したくないが、現金が必要</span>
+              <span class="opt">税金（利確時の課税）を回避したい</span>
+              <span class="opt">一時的な資金繰り（事業・税金支払い等）</span>
+              <span class="opt">住宅・車・教育等のまとまった支出</span>
+              <span class="opt">投資資金の追加調達</span>
+              <span class="opt">情報収集／興味本位</span>
+              <span class="opt">その他（自由記述）</span>
+            </div>
+          </div>
+
+          <div class="survey-q">
+            <div class="q-label">Q3. 現在、入金（担保預け入れ）はお済みですか？<span class="q-type">単一選択</span></div>
+            <div class="q-options">
+              <span class="opt">入金済み</span>
+              <span class="opt">入金準備中</span>
+              <span class="opt">まだ入金していない</span>
+              <span class="opt">利用を見送る予定</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="survey-block">
+          <h4>セクション2：分かりづらかった点・改善要望</h4>
+
+          <div class="survey-q">
+            <div class="q-label">Q4. CryptoPawnを利用する上で、分かりづらいと感じた点はありますか？<span class="q-type">複数選択可</span></div>
+            <div class="q-options">
+              <span class="opt">会員登録までのプロセス</span>
+              <span class="opt">本人確認（KYC）の手順</span>
+              <span class="opt">借入申込フォームの入力</span>
+              <span class="opt">担保送付（暗号資産の送金）の手順</span>
+              <span class="opt">契約条件・利率・極度額の理解</span>
+              <span class="opt">マージンコール／清算時の取扱いの理解</span>
+              <span class="opt">サイトのUI・UX全般</span>
+              <span class="opt">問い合わせ・サポート窓口の所在</span>
+              <span class="opt">特に分かりづらい点はなかった</span>
+              <span class="opt">その他（自由記述）</span>
+            </div>
+          </div>
+
+          <div class="survey-q">
+            <div class="q-label">Q5. 入金（担保預け入れ）に踏み切れていない場合、その理由を教えてください<span class="q-type">複数選択可</span></div>
+            <div class="q-options">
+              <span class="opt">仕組み・条件をもう少し理解してから判断したい</span>
+              <span class="opt">担保資産が戻ってこないリスクが不安</span>
+              <span class="opt">マージンコール（追加担保）の条件が不安</span>
+              <span class="opt">運営会社の信頼性が判断できない</span>
+              <span class="opt">操作方法が分からない</span>
+              <span class="opt">今すぐ資金需要がない</span>
+              <span class="opt">他サービスと比較検討中</span>
+              <span class="opt">該当しない（既に入金済み）</span>
+              <span class="opt">その他（自由記述）</span>
+            </div>
+          </div>
+
+          <div class="survey-q">
+            <div class="q-label">Q6. もしCryptoPawnに改善してほしい点があれば、自由にお書きください<span class="q-type">自由記述（任意）</span></div>
+            <div class="q-options" style="color:#94a3b8;">テキストエリア（最大500文字）</div>
+          </div>
+        </div>
+
+        <div class="survey-block">
+          <h4>セクション3：Amazonギフト送付用</h4>
+
+          <div class="survey-q">
+            <div class="q-label">Q7. Amazonギフトカード受取用メールアドレス<span class="q-type">必須・メールアドレス形式</span></div>
+            <div class="q-options" style="color:#94a3b8;">※ご登録メールアドレスと同一のもので問題ありません</div>
+          </div>
+
+          <div class="survey-q">
+            <div class="q-label">Q8. 個別相談を希望しますか？<span class="q-type">単一選択</span></div>
+            <div class="q-options">
+              <span class="opt">希望する（担当から連絡）</span>
+              <span class="opt">希望しない</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout">
+          <b>運用設計</b>
+          ・配布媒体：Googleフォーム（指定がないため、集計・スプシ連携のしやすさで選定）<br>
+          ・回答完了後は、CryptoPawn の登録メールアドレスと突合し、対象外（あめふり）を除外したうえで翌営業日にAmazonギフトコードを送付<br>
+          ・Amazonギフトはバルクで購入し、Googleスプレッドシートで「回答者 × コード」をマッピング<br>
+          ・回答結果は、Q4・Q5 のクロス集計でUI/UX改善の優先度を可視化（だいすけさんと連携）
+        </div>
+
+        <div class="feedback-area" data-step="survey">
+          <div class="feedback-toggle" onclick="toggleFeedback(this)">
+            <span class="fb-icon">memo</span> フィードバック
+            <span class="fb-count"></span>
+          </div>
+          <div class="feedback-body">
+            <textarea class="feedback-textarea" data-key="fb-survey" placeholder="アンケート設問へのコメント..." oninput="saveFeedback(this)"></textarea>
+            <div class="feedback-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="export-bar">
+    <button class="export-btn" onclick="exportFeedback()">フィードバックをコピー</button>
+    <button class="export-btn danger" onclick="clearAllFeedback()">全コメントをクリア</button>
+  </div>
+
+</div>
+
+<script>
+  // Feedback persistence (localStorage)
+  document.querySelectorAll('.feedback-textarea').forEach(t => {
+    const k = t.dataset.key;
+    const v = localStorage.getItem(k);
+    if (v) {
+      t.value = v;
+      const toggle = t.closest('.feedback-area').querySelector('.feedback-toggle');
+      toggle.classList.add('has-content');
+      const count = toggle.querySelector('.fb-count');
+      count.textContent = v.length + '字';
+    }
+  });
+
+  function toggleFeedback(el) {
+    const body = el.parentElement.querySelector('.feedback-body');
+    body.classList.toggle('open');
+  }
+
+  function saveFeedback(t) {
+    const k = t.dataset.key;
+    localStorage.setItem(k, t.value);
+    const status = t.parentElement.querySelector('.feedback-status');
+    status.textContent = '自動保存しました';
+    const toggle = t.closest('.feedback-area').querySelector('.feedback-toggle');
+    const count = toggle.querySelector('.fb-count');
+    if (t.value.length > 0) {
+      toggle.classList.add('has-content');
+      count.textContent = t.value.length + '字';
+    } else {
+      toggle.classList.remove('has-content');
+    }
+    setTimeout(() => { status.textContent = ''; }, 1500);
+  }
+
+  function exportFeedback() {
+    let out = '# CryptoPawn ステップメール フィードバック\n\n';
+    document.querySelectorAll('.feedback-area').forEach(area => {
+      const step = area.dataset.step;
+      const ta = area.querySelector('.feedback-textarea');
+      if (ta.value.trim()) {
+        out += '## ' + step + '\n' + ta.value.trim() + '\n\n';
+      }
+    });
+    if (out === '# CryptoPawn ステップメール フィードバック\n\n') {
+      alert('フィードバックがまだ入力されていません');
+      return;
+    }
+    navigator.clipboard.writeText(out).then(() => {
+      alert('フィードバックをクリップボードにコピーしました');
+    });
+  }
+
+  function clearAllFeedback() {
+    if (!confirm('全てのフィードバックを削除します。よろしいですか？')) return;
+    document.querySelectorAll('.feedback-textarea').forEach(t => {
+      t.value = '';
+      localStorage.removeItem(t.dataset.key);
+    });
+    document.querySelectorAll('.feedback-toggle').forEach(tg => tg.classList.remove('has-content'));
+  }
+</script>
+
+</body>
+</html>
